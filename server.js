@@ -3,38 +3,87 @@ const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+
 const app = express();
 const PORT = 3000;
-
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// 讀取 `client-version`
-let clientVersion = "1x4x2"; // 預設值
+// 預設設定
+let config = {
+    userId: "9243242896",
+    authToken: "Bearer 固定的TOKEN",
+    clientVersion: "1x4x2",
+    userCookie: "_cf_bm=固定的Cookie"
+};
+
+// 讀取設定檔
 if (fs.existsSync(CONFIG_FILE)) {
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-    clientVersion = config.clientVersion;
+    config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
 }
 
 app.use(cors());
 app.use(express.json());
 
-// 取得 `client-version`
-app.get('/api/get_version', (req, res) => {
-    res.json({ clientVersion });
+// 取得完整 API 設定
+app.get('/api/get_config', (req, res) => {
+    res.json(config);
 });
 
-// 設定新的 `client-version`
+// 更新 API 設定
+app.post('/api/set_config', (req, res) => {
+    const { userId, authToken, clientVersion, userCookie } = req.body;
+
+    if (userId) config.userId = userId;
+    if (authToken) config.authToken = authToken;
+    if (clientVersion) config.clientVersion = clientVersion;
+    if (userCookie) config.userCookie = userCookie;
+
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 4), 'utf-8');
+    res.json({ message: "設定更新成功", config });
+});
+
+// 取得 Client-Version
+app.get('/api/get_version', (req, res) => {
+    res.json({ clientVersion: config.clientVersion });
+});
+
+// 設定 Client-Version
 app.post('/api/set_version', (req, res) => {
     if (req.body.clientVersion) {
-        clientVersion = req.body.clientVersion;
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify({ clientVersion }), 'utf-8'); // 儲存版本
-        res.json({ message: "client-version 更新成功", clientVersion });
+        config.clientVersion = req.body.clientVersion;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 4), 'utf-8');
+        res.json({ message: "client-version 更新成功", clientVersion: config.clientVersion });
     } else {
         res.status(400).json({ message: "請提供 client-version" });
     }
 });
 
-// 代理請求
+// 取得使用者資訊
+app.get('/api/userinfo', async (req, res) => {
+    console.log(`收到 API 請求，userId: ${config.userId}`);
+    try {
+        const response = await axios.get(`https://entry.orisries.playhorny.com/g/userinfo/detail/${config.userId}`, {
+            headers: {
+                "User-Agent": "UnityPlayer/2022.3.32f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
+                "Accept": "*/*",
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive",
+                "Host": "entry.orisries.playhorny.com",
+                "Authorization": config.authToken,
+                "horny-truedau": "ZFF3NHc5V2dYY1E=",
+                "client-version": config.clientVersion,
+                "X-Unity-Version": "2022.3.32f1",
+                "Cookie": config.userCookie
+            },
+            timeout: 5000
+        });
+        res.json(response.data);
+    } catch (error) {
+        res.status(error.response?.status || 500).json({ error: error.message });
+    }
+});
+
+// 取得伺服器狀態
 app.get('/api/route_status', async (req, res) => {
     try {
         const response = await axios.get('https://entry.orisries.playhorny.com/route_status', {
@@ -42,14 +91,14 @@ app.get('/api/route_status', async (req, res) => {
                 "Accept": "application/json",
                 "User-Agent": "UnityPlayer/2022.3.32f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
                 "horny-truedau": "ZFF3NHc5V2dYY1E=",
-                "client-version": clientVersion, // 這裡動態使用變數
+                "client-version": config.clientVersion,
                 "X-Unity-Version": "2022.3.32f1"
             }
         });
         res.json(response.data);
     } catch (error) {
         console.error("API 呼叫錯誤:", error.message);
-        res.status(500).send("伺服器錯誤: " + error.message);
+        res.status(500).json({ error: "伺服器錯誤: " + error.message });
     }
 });
 
