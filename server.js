@@ -59,10 +59,12 @@ app.post('/api/set_version', (req, res) => {
 });
 
 // 取得使用者資訊
-app.get('/api/userinfo', async (req, res) => {
-    console.log(`收到 API 請求，userId: ${config.userId}`);
+app.get('/api/userinfo/:userId', async (req, res) => {
+    const userId = req.params.userId;
+    console.log(`收到查詢請求，userId: ${userId}`);
+    
     try {
-        const response = await axios.get(`https://entry.orisries.playhorny.com/g/userinfo/detail/${config.userId}`, {
+        const response = await axios.get(`https://entry.orisries.playhorny.com/g/userinfo/detail/${userId}`, {
             headers: {
                 "User-Agent": "UnityPlayer/2022.3.32f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
                 "Accept": "*/*",
@@ -77,9 +79,11 @@ app.get('/api/userinfo', async (req, res) => {
             },
             timeout: 5000
         });
+
         res.json(response.data);
     } catch (error) {
-        res.status(error.response?.status || 500).json({ error: error.message });
+        console.error("取得使用者資訊時發生錯誤:", error.message);
+        res.status(error.response?.status || 500).json({ error: "無法取得使用者資訊：" + error.message });
     }
 });
 
