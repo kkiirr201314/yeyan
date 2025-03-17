@@ -63,6 +63,13 @@ app.get('/api/userinfo/:userId', async (req, res) => {
     const userId = req.params.userId;
     console.log(`收到查詢請求，userId: ${userId}`);
     
+    // 如果 userId 無效，直接回傳錯誤，防止伺服器卡住
+    if (!userId || userId.toLowerCase() === "none" || isNaN(userId)) {
+        console.error(`無效的 userId: ${userId}`);
+        return res.status(400).json({ error: "無效的 user_id" });
+    }
+
+    
     try {
         const response = await axios.get(`https://entry.orisries.playhorny.com/g/userinfo/detail/${userId}`, {
             headers: {
